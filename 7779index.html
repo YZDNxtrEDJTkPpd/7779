@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBERDYNE 分析ダッシュボード</title>
+<style>
+  :root{
+    --paper:#EEF1F4;--panel:#FBFCFD;--ink:#14171C;--ink-soft:#5A626E;--line:#D4DAE1;
+    --signal:#0AA7A0;--signal-deep:#06726D;--target:#C2872B;--target-bg:#FBF1DC;
+    --sci:#3D6FE0;--sci-deep:#2950B0;--good:#1E8E5A;--good-bg:#E5F4EC;--red:#B23A3A;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;padding:16px 13px 50px;}
+  .wrap{max-width:860px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--signal-deep);font-weight:600;}
+  h1{font-size:21px;font-weight:750;letter-spacing:-.01em;margin:.25em 0 .5em;}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab{font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);padding:9px 13px;border-radius:9px;}
+  .tab.on{background:#14171C;color:#fff;border-color:#14171C;}
+  .pane{display:none;}.pane.on{display:block;}
+
+  .bench{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:0 0 14px;}
+  .bench .c{background:var(--panel);padding:9px 12px;flex:1 1 120px;}
+  .bench .k{font-family:var(--mono);font-size:10px;color:var(--ink-soft);text-transform:uppercase;}
+  .bench .v{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:2px;}
+  .bench .v span{color:var(--red);}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:13px;}
+  .panel h2{font-size:14px;margin:0 0 3px;font-weight:700;}
+  .panel .d{font-size:11.5px;color:var(--ink-soft);margin:0 0 12px;}
+  .presets{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+  .pb{font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 11px;border-radius:999px;line-height:1.25;text-align:center;}
+  .pb small{display:block;font-weight:400;font-family:var(--mono);font-size:9.5px;color:var(--ink-soft);margin-top:1px;}
+  .lever{margin-bottom:14px;}
+  .lever .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
+  .lever label{font-size:12.5px;font-weight:600;}
+  .lever .out{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--signal-deep);}
+  input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:4px;background:linear-gradient(90deg,var(--c,var(--signal)) 0%,var(--c,var(--signal)) var(--fill,40%),var(--line) var(--fill,40%),var(--line) 100%);}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--signal-deep);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--signal-deep);cursor:pointer;}
+  .lnote{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .fields{display:flex;gap:12px;flex-wrap:wrap;}
+  .fields .f{display:flex;flex-direction:column;gap:3px;}
+  .fields .f label{font-size:10.5px;color:var(--ink-soft);}
+  .fields .f input{font-family:var(--mono);font-size:14px;width:84px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);}
+  .fields .f input:focus{outline:none;border-color:var(--signal);}
+
+  .reqgrid{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:4px;}
+  .reqgrid .col{background:var(--panel);flex:1;padding:13px 8px;text-align:center;}
+  .reqgrid .px{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .reqgrid .rev{font-family:var(--mono);font-size:21px;font-weight:700;margin:3px 0 1px;color:var(--target);}
+  .reqgrid .net{font-family:var(--mono);font-size:10px;color:var(--ink-soft);}
+
+  .info{border:1px solid var(--signal);background:#E9F7F5;border-radius:12px;padding:12px 13px;margin-bottom:13px;}
+  .info h3{margin:0 0 4px;font-size:12.5px;color:var(--signal-deep);font-weight:700;}
+  .info p{margin:0;font-size:11.5px;color:#2c4f4c;line-height:1.55;}
+  .panel.deal h2{color:var(--sci-deep);}.deal input[type=range]{--c:var(--sci);}
+
+  .compare h2{font-size:14px;margin:0 0 12px;font-weight:700;}
+  .cbar{margin-bottom:12px;}
+  .cbar .lab{font-size:11px;color:var(--ink-soft);margin-bottom:4px;font-family:var(--mono);}
+  .cbar .track{display:flex;height:28px;border-radius:7px;overflow:hidden;background:var(--line);}
+  .cbar .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;}
+  .legend{display:flex;flex-wrap:wrap;gap:9px 14px;margin-top:4px;font-size:11px;color:var(--ink-soft);}
+  .legend span{font-family:var(--mono);}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+  .insight{font-size:11.5px;color:#7a4d12;background:#FBF1DC;border:1px solid #E8D6AC;border-radius:8px;padding:9px 11px;margin-top:10px;line-height:1.55;}
+  .ln{border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-bottom:8px;background:var(--panel);border-left-width:4px;}
+  .ln .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .ln .nm{font-size:12.5px;font-weight:600;}
+  .ln .o{font-family:var(--mono);font-size:13px;white-space:nowrap;}.ln .o b{font-size:14px;}.ln .o .g{color:var(--good);font-size:10.5px;}
+  .ln .inp{display:flex;gap:9px;margin-top:8px;flex-wrap:wrap;}
+  .ln .f{display:flex;flex-direction:column;gap:2px;}.ln .f label{font-size:10px;color:var(--ink-soft);}
+  .ln .f input{font-family:var(--mono);font-size:13px;width:74px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);}
+
+  .result{background:#14171C;color:#fff;border-radius:14px;padding:17px;margin-top:14px;}
+  .result .chain{display:flex;flex-wrap:wrap;gap:1px;background:#2a2f38;border-radius:10px;overflow:hidden;}
+  .result .step{background:#1b1f27;flex:1 1 105px;padding:11px 12px;}
+  .result .step .k{font-family:var(--mono);font-size:10px;color:#9aa3b0;text-transform:uppercase;}
+  .result .step .v{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:3px;}
+  .result .step.op .v.good{color:#56D79A;}.result .step.op .v.bad{color:#FF8A8A;}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-top:6px;}
+  .badge.good{background:var(--good-bg);color:var(--good);}.badge.bad{background:#3a2326;color:#FF9C9C;}
+  .yoy{font-family:var(--mono);font-size:11.5px;color:#9aa3b0;margin-top:11px;line-height:1.6;}.yoy b{color:#fff;}.yoy .pos{color:#56D79A;}.yoy .neg{color:#FF8A8A;}
+  footer{margin-top:20px;font-size:10.5px;color:var(--ink-soft);line-height:1.6;border-top:1px solid var(--line);padding-top:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">CYBERDYNE 7779 — Personal Dashboard</div>
+  <h1>CYBERDYNE 分析ダッシュボード</h1>
+  <div class="tabs">
+    <button class="tab on" data-p="val">① バリュエーション</button>
+    <button class="tab" data-p="fc">② FY3/27予想</button>
+    <button class="tab" data-p="ln">③ ライン別</button>
+  </div>
+
+  <!-- ============ TAB 1: VALUATION ============ -->
+  <section class="pane on" id="pane-val">
+    <p class="d" style="margin-top:-4px">目標株価に必要な業績を逆算。プリセットで評価モデルを切替（発行済1.374億株）。</p>
+    <div class="panel">
+      <div class="presets">
+        <button class="pb" data-per="57" data-m="28">ダビンチ型<small>PER57・利益28%</small></button>
+        <button class="pb" data-per="100" data-m="20">ストーリー型<small>PER100・利益20%</small></button>
+        <button class="pb" data-per="38" data-m="12">黒字ロボ大手<small>PER38・利益12%</small></button>
+        <button class="pb" data-per="30" data-m="10">保守型<small>PER30・利益10%</small></button>
+      </div>
+      <div class="lever"><div class="row"><label>想定PER</label><span class="out" id="v_operr">57倍</span></div><input type="range" id="v_per" min="10" max="150" value="57" step="1"></div>
+      <div class="lever"><div class="row"><label>純利益率</label><span class="out" id="v_omar">28%</span></div><input type="range" id="v_mar" min="1" max="35" value="28" step="1"></div>
+      <div class="lever"><div class="row"><label>現在値（倍率基準）</label><span class="out" id="v_opx">¥257</span></div><input type="range" id="v_px" min="180" max="600" value="257" step="5"></div>
+    </div>
+    <h2 id="v_title" style="font-size:14px;margin:4px 2px 8px;">目標株価に必要な年間売上</h2>
+    <div class="reqgrid" id="v_grid"></div>
+    <p class="lnote" style="margin-top:8px;">必要売上 ＝ 目標時価総額 ÷ 想定PER ÷ 純利益率。低PERほど必要売上は急増。</p>
+  </section>
+
+  <!-- ============ TAB 2: FY27 FORECAST ============ -->
+  <section class="pane" id="pane-fc">
+    <div class="bench">
+      <div class="c"><div class="k">FY3/25 売上</div><div class="v">43.84億</div></div>
+      <div class="c"><div class="k">FY3/26 売上(土台)</div><div class="v">38.46億</div></div>
+      <div class="c"><div class="k">FY3/26 営業益</div><div class="v"><span>-6.01億</span></div></div>
+    </div>
+    <div class="info"><h3>◆ マレーシアPERKESOセンターの扱い</h3><p>65台は2024年末から段階導入・5年分散計上で、既に182台と土台に内包済み（年約2.5億の継続収益）。よって伸びは「新規ディール」で積む（二重計上回避）。</p></div>
+    <div class="panel"><h2>① 本業オーガニック成長率</h2><p class="d">FY3/26土台（マレーシア現行分込み）の伸び。1H実質は概ね+4〜7%。</p>
+      <div class="lever"><div class="row"><label>成長率</label><span class="out" id="f_oorg">+5%</span></div><input type="range" id="f_org" min="-10" max="30" value="5" step="1"></div></div>
+    <div class="panel deal"><h2>② 新規大型ディール（マレーシアの次）</h2><p class="d">他国の国立センター等、まだ土台に無い新規。大型は5年分散ゆえ初年度は立ち上がり分のみ。</p>
+      <div class="fields" style="margin-bottom:12px;">
+        <div class="f"><label>新規センター数</label><input type="number" id="f_nc" value="0" min="0" step="1"></div>
+        <div class="f"><label>1施設台数</label><input type="number" id="f_nu" value="65" min="0" step="5"></div>
+        <div class="f"><label>単価(万円/年)</label><input type="number" id="f_nr" value="250" min="0" step="10"></div></div>
+      <div class="lever"><div class="row"><label>初年度立ち上がり率</label><span class="out" id="f_oramp">40%</span></div><input type="range" id="f_ramp" min="0" max="100" value="40" step="5"></div></div>
+    <div class="panel"><h2>③ 新適応 上乗せ（SCI・小児/CP）</h2><p class="d">SCIはドイツ治験結果待ち（日本適応は早くて2030年前後）。FY3/27寄与は限定的。初期値0。</p>
+      <div class="lever"><div class="row"><label>新適応 上乗せ(億)</label><span class="out" id="f_oind">0.0</span></div><input type="range" id="f_ind" min="0" max="20" value="0" step="0.5"></div></div>
+    <div class="panel"><h2>前提（利益）</h2><div class="fields">
+      <div class="f"><label>粗利率 %</label><input type="number" id="f_gm" value="55" step="1"></div>
+      <div class="f"><label>営業費用 億</label><input type="number" id="f_opex" value="27.2" step="0.5"></div></div></div>
+    <div class="result"><div class="chain">
+      <div class="step"><div class="k">FY3/27 売上</div><div class="v" id="f_rev">—</div></div>
+      <div class="step"><div class="k">売上総利益</div><div class="v" id="f_gp">—</div></div>
+      <div class="step op"><div class="k">営業利益</div><div class="v" id="f_op">—</div><span id="f_badge"></span></div></div>
+      <div class="yoy" id="f_yoy"></div></div>
+  </section>
+
+  <!-- ============ TAB 3: LINE SENSITIVITY ============ -->
+  <section class="pane" id="pane-ln">
+    <p class="d" style="margin-top:-4px">各ラインの台数×単価×粗利率を調整。下の2バー（台数構成／粗利構成）のズレが「広く浅い／狭く深い」。</p>
+    <div class="panel compare">
+      <h2>構成比：台数 vs 粗利</h2>
+      <div class="cbar"><div class="lab">台数構成</div><div class="track" id="l_bu"></div></div>
+      <div class="cbar"><div class="lab">粗利構成</div><div class="track" id="l_bg"></div></div>
+      <div class="legend" id="l_leg"></div>
+      <div class="insight" id="l_ins"></div>
+    </div>
+    <div id="l_lines"></div>
+    <div class="panel"><h2>その他・費用</h2><div class="fields">
+      <div class="f"><label>その他収益 億</label><input type="number" id="l_oth" value="15.7" step="0.1"></div>
+      <div class="f"><label>その他粗利率 %</label><input type="number" id="l_othg" value="54" step="1"></div>
+      <div class="f"><label>営業費用 億</label><input type="number" id="l_opex" value="33" step="0.5"></div></div></div>
+    <div class="result"><div class="chain">
+      <div class="step"><div class="k">売上収益</div><div class="v" id="l_rev">—</div></div>
+      <div class="step"><div class="k">売上総利益</div><div class="v" id="l_gp">—</div></div>
+      <div class="step op"><div class="k">営業利益</div><div class="v" id="l_op">—</div><span id="l_badge"></span></div></div>
+      <div class="yoy" id="l_yoy"></div></div>
+  </section>
+
+  <footer>
+    数値はCYBERDYNE公開決算（FY3/25・FY3/26）等に基づく概算。単価・ライン別粗利率は非開示のため実績整合的に置いた推定の調整可能値。<b>本ツールは概算シミュレーションであり、業績予想・投資助言ではありません。</b><br><br>
+    MIT License © 2026 — 本ソフトウェアは「現状有姿」で提供され、明示黙示を問わずいかなる保証もありません。利用により生じた損害について作者は責任を負いません。著作権表示と本許諾表示を残せば、複製・改変・再配布を自由に行えます。
+  </footer>
+</div>
+
+<script>
+// ---------- tabs ----------
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); document.getElementById('pane-'+t.dataset.p).classList.add('on');
+}));
+const f1=n=>n.toLocaleString("ja-JP",{minimumFractionDigits:1,maximumFractionDigits:1});
+const oku=n=>n.toLocaleString("ja-JP",{maximumFractionDigits:0});
+const fill=(el,mn,mx)=>el.style.setProperty('--fill',((el.value-mn)/(mx-mn)*100)+'%');
+
+// ---------- TAB1: valuation ----------
+(function(){
+  const SH=137445809, TG=[1500,2000,2500], $=id=>document.getElementById(id);
+  function R(){
+    const per=+$('v_per').value, m=+$('v_mar').value, px=+$('v_px').value;
+    $('v_operr').textContent=per+'倍'; $('v_omar').textContent=m+'%'; $('v_opx').textContent='¥'+px.toLocaleString('ja-JP');
+    fill($('v_per'),10,150); fill($('v_mar'),1,35); fill($('v_px'),180,600);
+    $('v_title').textContent=`目標株価に必要な年間売上（PER${per}倍・純利益率${m}%）`;
+    let h='';
+    TG.forEach(t=>{
+      const mc=t*SH, net=mc/per, rev=net/(m/100);
+      h+=`<div class="col"><div class="px">¥${t.toLocaleString('ja-JP')}</div><div class="rev">${oku(rev/1e8)}<span style="font-size:12px">億</span></div><div class="net">純利益 ${oku(net/1e8)}億 / 現在値の${(t/px).toFixed(1)}×</div></div>`;
+    });
+    $('v_grid').innerHTML=h;
+  }
+  document.querySelectorAll('#pane-val .pb').forEach(b=>b.addEventListener('click',()=>{$('v_per').value=b.dataset.per;$('v_mar').value=b.dataset.m;R();}));
+  ['v_per','v_mar','v_px'].forEach(i=>$(i).addEventListener('input',R)); R();
+})();
+
+// ---------- TAB2: FY27 forecast ----------
+(function(){
+  const B=38.46, FY25=43.84, $=id=>document.getElementById(id);
+  function R(){
+    const org=+$('f_org').value, ramp=+$('f_ramp').value, nc=+$('f_nc').value||0, nu=+$('f_nu').value||0, nr=+$('f_nr').value||0, ind=+$('f_ind').value||0, gm=+$('f_gm').value||0, opex=+$('f_opex').value||0;
+    $('f_oorg').textContent=(org>=0?'+':'')+org+'%'; fill($('f_org'),-10,30);
+    $('f_oramp').textContent=ramp+'%'; fill($('f_ramp'),0,100);
+    $('f_oind').textContent=f1(ind); fill($('f_ind'),0,20);
+    const base=B*(1+org/100), deal=nc*nu*nr/10000*(ramp/100), rev=base+deal+ind, gp=rev*gm/100, op=gp-opex;
+    $('f_rev').textContent=f1(rev)+'億'; $('f_gp').textContent=f1(gp)+'億';
+    const e=$('f_op'); e.textContent=(op>=0?'+':'')+f1(op)+'億'; e.className='v '+(op>=0?'good':'bad');
+    const b=$('f_badge'); b.textContent=op>=0?'営業黒字 🎉':'営業赤字'; b.className='badge '+(op>=0?'good':'bad');
+    const be=gm>0?opex/(gm/100):0, sp=v=>`<span class="${v>=0?'pos':'neg'}">${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+    $('f_yoy').innerHTML=`FY3/27売上 <b>${f1(rev)}億</b>（土台${f1(base)}＋新規${f1(deal)}＋新適応${f1(ind)}）／ FY3/26比 ${sp((rev-B)/B*100)}<br>`+(op>=0?'営業黒字突破。':`営業黒字まで売上あと <b>${f1(be-rev)}億</b>`);
+  }
+  ['f_org','f_ramp','f_ind','f_nc','f_nu','f_nr','f_gm','f_opex'].forEach(i=>$(i).addEventListener('input',R)); R();
+})();
+
+// ---------- TAB3: line sensitivity ----------
+(function(){
+  const $=id=>document.getElementById(id);
+  const L=[
+    {nm:"医療用HAL 下肢",sh:"医療下肢",col:"#0AA7A0",u:527,r:250,g:60},
+    {nm:"HAL 単関節",sh:"単関節",col:"#3D6FE0",u:697,r:60,g:55},
+    {nm:"自立支援 下肢(非医療)",sh:"自立支援",col:"#C2872B",u:367,r:120,g:50},
+    {nm:"腰タイプ 介護・自立支援",sh:"腰・介護",col:"#9B5DE5",u:1098,r:30,g:42},
+    {nm:"腰タイプ 作業支援",sh:"腰・作業",col:"#E06A8B",u:422,r:30,g:42},
+    {nm:"清掃・搬送ロボット",sh:"清掃搬送",col:"#5A8F4E",u:178,r:100,g:45},
+  ];
+  let st=L.map(x=>({u:x.u,r:x.r,g:x.g}));
+  let h='';
+  L.forEach((l,i)=>{h+=`<div class="ln" style="border-left-color:${l.col}"><div class="top"><div class="nm">${l.nm}</div><div class="o"><b id="l_rv${i}">—</b>億 <span class="g" id="l_g${i}"></span></div></div><div class="inp"><div class="f"><label>台数</label><input type="number" id="l_u${i}" value="${l.u}" min="0"></div><div class="f"><label>単価(万/年)</label><input type="number" id="l_p${i}" value="${l.r}" min="0" step="5"></div><div class="f"><label>粗利率%</label><input type="number" id="l_m${i}" value="${l.g}" min="0" max="100"></div></div></div>`;});
+  $('l_lines').innerHTML=h;
+  $('l_leg').innerHTML=L.map(l=>`<span><i style="background:${l.col}"></i>${l.sh}</span>`).join('');
+  function R(){
+    const rev=st.map(s=>s.u*s.r/10000), gp=rev.map((r,i)=>r*st[i].g/100);
+    const tu=st.reduce((a,s)=>a+s.u,0), tr=rev.reduce((a,b)=>a+b,0), tg=gp.reduce((a,b)=>a+b,0);
+    rev.forEach((r,i)=>{$('l_rv'+i).textContent=f1(r);$('l_g'+i).textContent='粗利'+f1(gp[i]);});
+    const seg=(v,t,c)=>{const w=t>0?v/t*100:0;return `<div class="seg" style="width:${w}%;background:${c}">${w>=8?Math.round(w)+'%':''}</div>`;};
+    $('l_bu').innerHTML=L.map((l,i)=>seg(st[i].u,tu,l.col)).join('');
+    $('l_bg').innerHTML=L.map((l,i)=>seg(gp[i],tg,l.col)).join('');
+    const mu=st[0].u/tu*100, mg=tg>0?gp[0]/tg*100:0, ku=(st[3].u+st[4].u)/tu*100, kg=tg>0?(gp[3]+gp[4])/tg*100:0;
+    $('l_ins').innerHTML=`医療下肢は台数の<b>${Math.round(mu)}%</b>で粗利の<b>${Math.round(mg)}%</b>を稼ぐ（狭く深い）。腰タイプ(介護+作業)は台数<b>${Math.round(ku)}%</b>で粗利<b>${Math.round(kg)}%</b>（広く浅い）。`;
+    const oth=+$('l_oth').value||0, og=+$('l_othg').value||0, opex=+$('l_opex').value||0;
+    const TR=tr+oth, TG=tg+oth*og/100, op=TG-opex;
+    $('l_rev').textContent=f1(TR)+'億'; $('l_gp').textContent=f1(TG)+'億';
+    const e=$('l_op'); e.textContent=(op>=0?'+':'')+f1(op)+'億'; e.className='v '+(op>=0?'good':'bad');
+    const b=$('l_badge'); b.textContent=op>=0?'営業黒字 🎉':'営業赤字'; b.className='badge '+(op>=0?'good':'bad');
+    $('l_yoy').innerHTML=`売上 <b>${f1(TR)}億</b>（製品${f1(tr)}＋その他${f1(oth)}）／ 全社粗利率 <b>${(TG/TR*100).toFixed(0)}%</b>／ 稼働計 <b>${tu.toLocaleString()}台</b>`;
+  }
+  L.forEach((l,i)=>{['u','p','m'].forEach(k=>{const map={u:'u',p:'r',m:'g'};$('l_'+k+i).addEventListener('input',e=>{st[i][map[k]]=+e.target.value||0;R();});});});
+  ['l_oth','l_othg','l_opex'].forEach(i=>$(i).addEventListener('input',R)); R();
+})();
+</script>
+</body>
+</html>
